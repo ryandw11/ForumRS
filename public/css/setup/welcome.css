@@ -1,0 +1,13 @@
+h1 {
+    color: black;
+    text-align: center;
+}
+
+.RS {
+    color: orange;
+}
+
+#welcome-message {
+    width: 75%;
+    margin: auto;
+}
