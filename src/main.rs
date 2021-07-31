@@ -10,10 +10,10 @@ use std::sync::{Arc, Mutex};
 use actix_files as actixfs;
 use actix_web::{App, get, HttpResponse, HttpServer, post, Responder, web};
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
+use uuid::Uuid;
 
 use crate::settings::{BaseSettings, SettingsManager, SqlSettings};
-use crate::state::ForumRSState;
-
+use crate::state::SetupForumRSState;
 
 // type ForumWebData = web::Data<Arc<Mutex<ForumRSState<'static>>>>;
 
@@ -55,22 +55,31 @@ async fn main() -> std::io::Result<()> {
         .unwrap();
 
     if base_settings.new_setup {
+        // let console_session_login = Uuid::parse_str("145b9ba6-39da-4410-8493-f7b2f2137621").unwrap();
+        let console_session_login = Uuid::new_v4();
+        println!("The Configuration Login code is: {}", console_session_login);
+        println!("{}", console_session_login.clone());
         HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(ForumRSState {
-                    hbs: handlebars.clone()
+                .app_data(web::Data::new(SetupForumRSState {
+                    hbs: handlebars.clone(),
+                    setup_code: console_session_login,
+                    setup_session: Mutex::new(None),
                 }))
                 .service(actixfs::Files::new("/public", "./public"))
                 .service(setup::setup_router::welcome)
                 .service(setup::setup_router::login)
+                .service(setup::setup_router::auth_login)
         }).bind(format!("{}:{}", base_settings.ip, base_settings.port))?
             .run()
             .await
     } else {
         HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(ForumRSState {
-                    hbs: handlebars.clone()
+                .app_data(web::Data::new(SetupForumRSState {
+                    hbs: handlebars.clone(),
+                    setup_code: Uuid::new_v4(),
+                    setup_session: Mutex::new(None),
                 }))
                 .service(actixfs::Files::new(".", "./public").show_files_listing())
                 .service(setup::setup_router::welcome)

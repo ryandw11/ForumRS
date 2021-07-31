@@ -15,9 +15,9 @@
             <div id="welcome-message" class="alert alert-secondary">
                 Please enter in the code from the console below to continue with the configuration process.
             </div>
-            <form action="/auth/login" method="post" class="needs-validation" novalidate>
+            <form action="/auth/login" method="post" class="needs-validation" enctype="application/x-www-form-urlencoded" novalidate>
                     <div class="mt-5">
-                        <input class="form-control" type="password" placeholder="Enter code here..." required />
+                        <input name="login_code" class="form-control" type="password" placeholder="Enter code here..." required />
                     <div class="invalid-feedback">
                         You must enter a valid code from the console to continue configuring.
                     </div>
