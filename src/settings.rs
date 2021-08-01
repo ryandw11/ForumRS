@@ -9,16 +9,26 @@ use crate::setup::setup::SetupStage::{General};
 */
 #[derive(Deserialize, Serialize)]
 pub struct BaseSettings {
+    /// The name of the website
     pub(crate) name: String,
+    /// The ip of the website: (ex: 127.0.0.1)
     pub(crate) ip: String,
+    /// The port of the website: (ex: 8080)
     pub(crate) port: u16,
+    /// The type of database to be used.
     pub(crate) database_type: String,
+    /// The MySQL settings. (Only exist if database_type is MySQL)
     pub(crate) mysql_settings: Option<MysqlSettings>,
+    /// The SQLite settings. (Only exist if database_type is SQLite)
     pub(crate) sql_settings: Option<SqlSettings>,
+    /// If the program should use SSL
     pub(crate) use_sll: bool,
+    /// The options for SSL.
     pub(crate) ssl_settings: Option<SSLSettings>,
     // Responsible for storing data about setup.
+    /// If the program is being setup for the first time.
     pub(crate) new_setup: bool,
+    /// The current setup stage.
     pub(crate) setup_stage: Option<SetupStage>,
 }
 
@@ -44,6 +54,7 @@ impl BaseSettings {
 */
 #[derive(Deserialize, Serialize)]
 pub struct MysqlSettings {
+    /// The URL of the database.
     pub(crate) database_url: String
 }
 
@@ -52,6 +63,7 @@ pub struct MysqlSettings {
 */
 #[derive(Deserialize, Serialize)]
 pub struct SqlSettings {
+    /// Location of the database file.
     pub(crate) file_location: String
 }
 
@@ -60,7 +72,9 @@ pub struct SqlSettings {
 */
 #[derive(Deserialize, Serialize)]
 pub struct SSLSettings {
+    /// The private key.
     pub(crate) private_key: String,
+    /// The public key.
     pub(crate) public_key: String
 }
 

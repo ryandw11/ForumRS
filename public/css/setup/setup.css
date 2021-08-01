@@ -3,6 +3,12 @@ h1 {
     text-align: center;
 }
 
+h2 {
+    color: black;
+    text-align: center;
+    font-size: 1.7em;
+}
+
 .RS {
     color: orange;
 }
@@ -14,4 +20,8 @@ h1 {
 
 .alert-danger {
     margin-top: 10px;
+}
+
+.info-nugget {
+    color: blue;
 }

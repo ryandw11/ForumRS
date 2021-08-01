@@ -1,0 +1,98 @@
+<html lang='en'>
+
+<head>
+    <title>General | ForumRS Setup</title>
+    <link rel='icon' href='public/default/default_favicon.png' type='image/png' sizes='16x16' />
+
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css' rel='stylesheet'
+        integrity='sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC' crossorigin='anonymous' />
+
+    <link rel='stylesheet' href='public/css/setup/setup.css' />
+</head>
+
+<body>
+    <main class='container'>
+        <h1 class="mt-5">Forum<span class='RS'>RS</span> Configuration</h1>
+        <h2 class='mb-5'>General</h2>
+
+        <div id='welcome-message' class='alert alert-secondary'>
+            Please fill out the following information regarding to the general configuration of ForumRS.<br />
+            All of these settings can be changed later on.
+        </div>
+        <div style='display: none;' id='general-error' class='alert alert-danger' role='alert'>
+            <i data-feather='alert-circle'></i>
+            <span>Error Message</span>
+        </div>
+        <div style='width: 70%; margin: auto'>
+            <form action='/auth/general' method='post' class='needs-validation'
+                enctype='application/x-www-form-urlencoded' novalidate>
+                {{!-- The input for the name of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='name' class='col-sm-2 col-form-label'>Website Name:</label>
+                    <div class='col-sm-9'>
+                        <input name='name' id='name' class='form-control' type='text' placeholder='Example: ForumRS'
+                            required />
+                        <div class='invalid-feedback'>
+                            You must enter a name for the website!
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Website Name Help'
+                        data-bs-content='The name of the website is what the site will be refered to as.'><i
+                            data-feather='info'></i></span>
+                </div>
+                {{!-- The input for the ip address of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='ip' class='col-sm-2 col-form-label'>IP Address:</label>
+                    <div class='col-sm-9'>
+                        <input name='ip' id='ip' class='form-control' type='text' value="127.0.0.1" pattern="^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$" required />
+                        <div class='invalid-feedback'>
+                            You must enter a valid Ipv4 Address for the website.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Ip Address Help'
+                        data-bs-content='This is the ipv4 address that you want to use. Note: This is NOT the domain name. You will almost always want to keep this 127.0.0.1.'><i
+                            data-feather='info'></i></span>
+                </div>
+                {{!-- The input for the port of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='port' class='col-sm-2 col-form-label'>Port:</label>
+                    <div class='col-sm-9'>
+                        <input name='port' id='port' class='form-control' type='text' value="8080" required />
+                        <div class='invalid-feedback'>
+                            You must enter a valid port for the website.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Port Help'
+                        data-bs-content='The port is the location of where the website will run. No other programs can run off of this port. The normal port values
+                        for a website are: 8080 and 8443. If you intend on using SSL then consider setting the port to 8443 instead of the default.'><i
+                            data-feather='info'></i></span>
+                </div>
+                <p class='text-center mt-5'><button type='submit' class='btn btn-success'>Configure & Continue</button>
+                </p>
+            </form>
+        </div>
+    </main>
+
+    <script src='public/js/setup/general.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js'
+        integrity='sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM'
+        crossorigin='anonymous'></script>
+    <script src='https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js'></script>
+    <script>
+        (function () {
+            'use strict'; feather.replace({ width: '24', height: '24', 'stroke-width': '1' }); var forms =
+                document.querySelectorAll('.needs-validation').forEach(function (form) {
+                    form.addEventListener('submit', function (event) {
+                        if
+                            (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); } form.classList.add('was-validated');
+                    }, false)
+                })
+        })();
+        for (nugget of document.querySelectorAll(".info-nugget")) { var popover = new bootstrap.Popover(nugget, { sanitize: false }); }
+    </script>
+</body>
+
+</html>

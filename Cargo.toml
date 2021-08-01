@@ -13,5 +13,6 @@ diesel = { version = "1.4.4", features = ["sqlite", "mysql"] }
 toml="0.5.8"
 serde = "1.0.126"
 serde_json = "1.0.66"
-handlebars = {version = "4.1.0", features = ["dir_source"]}
+handlebars = {version = "4.1.0", features = ["dir_source", "script_helper"]}
 uuid = { version = "0.8", features = ["serde", "v4"] }
+regex = "1.5.4"
