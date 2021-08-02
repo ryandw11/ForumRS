@@ -16,5 +16,9 @@ window.addEventListener('load', () => {
       errorDoc.getElementsByTagName('span')[0].textContent = 'Invalid Port. If you are not sure what to put there, then just use 8080!';
       errorDoc.style.display = 'block';
       break;
+    case '4':
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Invalid Domain. Please tell ForumRS what domain you intened on using. Do not include http or https. Example: forumrs.example.com.';
+      errorDoc.style.display = 'block';
+      break;
   }
 });

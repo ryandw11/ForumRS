@@ -70,6 +70,8 @@ async fn main() -> std::io::Result<()> {
                 .service(setup::setup_router::auth_login)
                 .service(setup::setup_router::general)
                 .service(setup::setup_router::auth_general)
+                .service(setup::setup_router::security)
+                .service(setup::setup_router::auth_security)
         }).bind(format!("{}:{}", base_settings.ip, base_settings.port))?
             .run()
             .await

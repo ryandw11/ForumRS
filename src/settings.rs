@@ -7,35 +7,45 @@ use crate::setup::setup::SetupStage::{General};
 /**
    Base Settings are the base settings for the website.
 */
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct BaseSettings {
     /// The name of the website
     pub(crate) name: String,
+    /// The domain of the website.
+    pub(crate) domain: String,
     /// The ip of the website: (ex: 127.0.0.1)
     pub(crate) ip: String,
     /// The port of the website: (ex: 8080)
     pub(crate) port: u16,
     /// The type of database to be used.
     pub(crate) database_type: String,
-    /// The MySQL settings. (Only exist if database_type is MySQL)
-    pub(crate) mysql_settings: Option<MysqlSettings>,
-    /// The SQLite settings. (Only exist if database_type is SQLite)
-    pub(crate) sql_settings: Option<SqlSettings>,
     /// If the program should use SSL
     pub(crate) use_sll: bool,
-    /// The options for SSL.
-    pub(crate) ssl_settings: Option<SSLSettings>,
+    /// If the program should use google reCAPTCHA v3.
+    pub(crate) use_captcha: bool,
     // Responsible for storing data about setup.
     /// If the program is being setup for the first time.
     pub(crate) new_setup: bool,
     /// The current setup stage.
     pub(crate) setup_stage: Option<SetupStage>,
+    //
+    // Setting Sections
+    //
+    /// The MySQL settings. (Only exist if database_type is MySQL)
+    pub(crate) mysql_settings: Option<MysqlSettings>,
+    /// The SQLite settings. (Only exist if database_type is SQLite)
+    pub(crate) sql_settings: Option<SqlSettings>,
+    /// The options for SSL.
+    pub(crate) ssl_settings: Option<SSLSettings>,
+    /// The settings for google reCAPTCHA v3.
+    pub(crate) captcha_settings: Option<CaptchaSettings>,
 }
 
 impl BaseSettings {
     pub fn create_default() -> BaseSettings {
         BaseSettings {
             name: "UnInitalized".to_string(),
+            domain: "forumrs.example.com".to_string(),
             ip: "127.0.0.1".to_string(),
             port: 8080,
             database_type: "UnInitalized".to_string(),
@@ -43,6 +53,8 @@ impl BaseSettings {
             sql_settings: None,
             use_sll: false,
             ssl_settings: None,
+            use_captcha: false,
+            captcha_settings: None,
             new_setup: true,
             setup_stage: Some(General),
         }
@@ -52,7 +64,7 @@ impl BaseSettings {
 /**
    The settings for a mysql database.
 */
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct MysqlSettings {
     /// The URL of the database.
     pub(crate) database_url: String
@@ -61,7 +73,7 @@ pub struct MysqlSettings {
 /**
    The settings for a SQLite database.
 */
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct SqlSettings {
     /// Location of the database file.
     pub(crate) file_location: String
@@ -70,12 +82,19 @@ pub struct SqlSettings {
 /**
    The settings for SSL.
 */
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct SSLSettings {
     /// The private key.
     pub(crate) private_key: String,
     /// The public key.
     pub(crate) public_key: String
+}
+
+/// The settings for Google reCAPTCHA v3
+#[derive(Deserialize, Serialize, Debug)]
+pub struct CaptchaSettings {
+    pub(crate) site_key: String,
+    pub(crate) secret_key: String,
 }
 
 /**
@@ -143,6 +162,10 @@ impl SettingsManager {
     Save settings to the settings file.
     */
     pub fn save_settings(base_settings: &BaseSettings) {
+        if toml::to_string(base_settings).is_err() {
+            println!("{:?}", base_settings);
+            println!("{}", toml::to_string(base_settings).unwrap_err());
+        }
         let str_setting = toml::to_string(base_settings).unwrap();
         fs::write("settings.toml", str_setting);
     }

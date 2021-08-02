@@ -9,11 +9,17 @@ h2 {
     font-size: 1.7em;
 }
 
+h3 {
+    color: black;
+    text-align: center;
+    font-size: 1.6em;
+}
+
 .RS {
     color: orange;
 }
 
-#welcome-message {
+.general-message {
     width: 75%;
     margin: auto;
 }

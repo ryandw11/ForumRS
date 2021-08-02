@@ -1,0 +1,147 @@
+<html lang='en'>
+
+<head>
+    <title>Security | ForumRS Setup</title>
+    <link rel='icon' href='public/default/default_favicon.png' type='image/png' sizes='16x16' />
+
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css' rel='stylesheet'
+        integrity='sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC' crossorigin='anonymous' />
+
+    <link rel='stylesheet' href='public/css/setup/setup.css' />
+</head>
+
+<body>
+    <main class='container'>
+        <h1 class="mt-5">Forum<span class='RS'>RS</span> Configuration</h1>
+        <h2 class='mb-5'>Security</h2>
+        <div style='width: 70%; margin: auto'>
+            <form action='/auth/security' method='post' class='needs-validation'
+                enctype='application/x-www-form-urlencoded' novalidate>
+                <h3>SSL</h3>
+                <div style='display: none;' id='ssl-error' class='alert alert-danger' role='alert'>
+                    <i data-feather='alert-circle'></i>
+                    <span>Error Message</span>
+                </div>
+                {{!-- The input for the SSL of the website. --}}
+                <div id='general-message' class='alert alert-secondary'>
+                    SSL allows for the secure transfer of data for ForumRS. To obtain SSL certificates see <a
+                        href="https://letsencrypt.org/getting-started/">letsencrypt.org</a>
+                    and <a href="https://certbot.eff.org/">Certbot</a>. (You can also use any other certificates
+                    provided by your host.)
+                </div>
+                <div class='mt-3 row mb-3'>
+                    <div class='col-sm-2'></div>
+                    <div class='col-sm-9'>
+                        <div class="form-check form-switch">
+                            <input name="useSSL" class="form-check-input" type="checkbox" id="useSSL" checked>
+                            <label class="form-check-label" for="useSSL">Use SSL</label>
+                            <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                                data-bs-trigger='hover focus' title='SSL Help' data-bs-content='SSL allows for the secure transfer of data on your website. SSL is what allows HTTPS to be used instead of HTTP. If you plan
+                        on having a public forum system then HTTPS is recommended.'><i data-feather='info'></i></span>
+                        </div>
+                    </div>
+                </div>
+                {{!-- The input for the ip address of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='privateKey' class='col-sm-2 col-form-label'>Private Key:</label>
+                    <div class='col-sm-9'>
+                        <input name='privateKey' id='privateKey' class='form-control' type='text' value="privkey.pem"
+                            pattern="^.*\.(pem|PEM|asn1|ASN1)$" required />
+                        <div class='invalid-feedback'>
+                            You must enter the private key for the SSL certificate.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Private Key Help' data-bs-content='The private key is one part of the SSL certificate. The private key is your seceret key only to be used by the server.
+                        You must put a valid file path here to the private key. The default location is where the ForumRS executable is located. Private keys
+                        provided by letsencrypt are named privkey.pem by default.'><i data-feather='info'></i></span>
+                </div>
+                {{!-- The input for the port of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='publicKey' class='col-sm-2 col-form-label'>Public Key:</label>
+                    <div class='col-sm-9'>
+                        <input name='publicKey' id='publicKey' class='form-control' type='text' value="fullchain.pem"
+                            pattern="^.*\.(pem|PEM|asn1|ASN1)$" required />
+                        <div class='invalid-feedback'>
+                            You must enter the public key for the SSL certificate.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Public Key Help' data-bs-content='The public key is the second part of the SSL certificate. You must provide a valid file path here to the public key. The
+                        default location is where the ForumRS executable is located. The public key provided by letsencrypt is named
+                        fullchain.pem by default.'><i data-feather='info'></i></span>
+                </div>
+                <h3>Google reCAPTCHA v3</h3>
+                <div style='display: none;' id='captcha-error' class='alert alert-danger' role='alert'>
+                    <i data-feather='alert-circle'></i>
+                    <span>Error Message</span>
+                </div>
+                <div id='general-message' class='alert alert-secondary'>
+                    Google reCAPTCHA works to prevent botting attacks on your website. It is used when a user logs in
+                    and creates an account. Register
+                    reCAPTCHA v3 keys <a href="https://g.co/recaptcha/v3">here</a>.
+                </div>
+                <div class='mt-3 row mb-3'>
+                    <div class='col-sm-2'></div>
+                    <div class='col-sm-9'>
+                        <div class="form-check form-switch">
+                            <input name="useCaptch" class="form-check-input" type="checkbox" id="useCaptch" checked>
+                            <label class="form-check-label" for="useCaptch">Use reCAPTCHA</label>
+                            <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                                data-bs-trigger='hover focus' title='reCAPTCHA Help' data-bs-content='Google reCAPTCHA prevents botting attacks against your forums. The v3 version does NOT
+                                require any user input such as a checkbox or picture selection. It is recommended to have this enabled on forums that could see
+                                large amounts traffic.'><i data-feather='info'></i></span>
+                        </div>
+                    </div>
+                </div>
+                <div class='mt-3 row mb-3'>
+                    <label for='siteKey' class='col-sm-2 col-form-label'>Site Key:</label>
+                    <div class='col-sm-9'>
+                        <input name='siteKey' id='siteKey' class='form-control' type='text' value="" required />
+                        <div class='invalid-feedback'>
+                            You must enter a valid site key.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Site Key Help' data-bs-content='This is the reCAPTCHA key that is labeled as Site Key
+                        on the reCAPTCHA dashboard.'><i data-feather='info'></i></span>
+                </div>
+                <div class='mt-3 row mb-3'>
+                    <label for='secretKey' class='col-sm-2 col-form-label'>Seceret Key:</label>
+                    <div class='col-sm-9'>
+                        <input name='secretKey' id='secretKey' class='form-control' type='password' value="" required />
+                        <div class='invalid-feedback'>
+                            You must enter a valid seceret key.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Secret Key Help' data-bs-content='This is the reCAPTCHA key that is labeled as Secret Key
+                        on the reCAPTCHA dashboard. This key is private an should not be shared.'><i
+                            data-feather='info'></i></span>
+                </div>
+                <p class='text-center mt-5'><button type='submit' class='btn btn-success'>Configure & Continue</button>
+                </p>
+            </form>
+        </div>
+    </main>
+
+    <script src='public/js/setup/security.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js'
+        integrity='sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM'
+        crossorigin='anonymous'></script>
+    <script src='https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js'></script>
+    <script>
+        (function () {
+            'use strict'; feather.replace({ width: '24', height: '24', 'stroke-width': '1' }); var forms =
+                document.querySelectorAll('.needs-validation').forEach(function (form) {
+                    form.addEventListener('submit', function (event) {
+                        if
+                            (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); } form.classList.add('was-validated');
+                    }, false)
+                })
+        })();
+        for (nugget of document.querySelectorAll(".info-nugget")) { var popover = new bootstrap.Popover(nugget, { sanitize: false }); }
+    </script>
+</body>
+
+</html>

@@ -45,7 +45,8 @@
                 <div class='mt-3 row mb-3'>
                     <label for='ip' class='col-sm-2 col-form-label'>IP Address:</label>
                     <div class='col-sm-9'>
-                        <input name='ip' id='ip' class='form-control' type='text' value="127.0.0.1" pattern="^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$" required />
+                        <input name='ip' id='ip' class='form-control' type='text' value="127.0.0.1"
+                            pattern="^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$" required />
                         <div class='invalid-feedback'>
                             You must enter a valid Ipv4 Address for the website.
                         </div>
@@ -69,6 +70,20 @@
                         data-bs-content='The port is the location of where the website will run. No other programs can run off of this port. The normal port values
                         for a website are: 8080 and 8443. If you intend on using SSL then consider setting the port to 8443 instead of the default.'><i
                             data-feather='info'></i></span>
+                </div>
+                {{!-- The input for the domain of the website. --}}
+                <div class='mt-3 row mb-3'>
+                    <label for='domain' class='col-sm-2 col-form-label'>Website Domain:</label>
+                    <div class='col-sm-9'>
+                        <input name='domain' id='domain' class='form-control' type='text'
+                            placeholder="forumrs.example.com" value="" required />
+                        <div class='invalid-feedback'>
+                            You must enter a valid domain for the website.
+                        </div>
+                    </div>
+                    <span class='col-sm-1 info-nugget col-form-label' tabindex='0' data-bs-toggle='popover'
+                        data-bs-trigger='hover focus' title='Domain Help' data-bs-content='This is the domain that you intend on using for the website. Please include the subdomain if you plan on having one. Note: Do not include
+                        http or https. Example: forumrs.example.com.'><i data-feather='info'></i></span>
                 </div>
                 <p class='text-center mt-5'><button type='submit' class='btn btn-success'>Configure & Continue</button>
                 </p>

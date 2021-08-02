@@ -4,3 +4,5 @@ Cargo.lock
 *.iml
 /.idea/
 settings.toml
+
+*.pem

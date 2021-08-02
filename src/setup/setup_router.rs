@@ -1,20 +1,24 @@
-use actix_web::{Responder, HttpResponse, get, post, web, http, HttpRequest, HttpMessage};
-use crate::state::{SetupForumRSState};
+use std::borrow::Borrow;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+
+use actix_web::{get, http, HttpMessage, HttpRequest, HttpResponse, post, Responder, web};
+use actix_web::web::{Bytes, Form};
+use handlebars::Handlebars;
+use regex::Regex;
 use serde::Deserialize;
 use serde_json::json;
-use handlebars::Handlebars;
 use uuid::Uuid;
-use std::str::FromStr;
-use crate::settings::{BaseSettings, SettingsManager};
-use std::sync::{Mutex, Arc};
-use std::borrow::Borrow;
-use crate::setup::setup::SetupStage::{General, Security};
-use regex::Regex;
+
+use crate::settings::{BaseSettings, SettingsManager, SSLSettings, CaptchaSettings};
+use crate::setup::setup::SetupStage::{General, Security, Storage};
+use crate::state::SetupForumRSState;
+use std::path::Path;
 
 /// The welcome (index) page for the setup process.
 #[get("/")]
 pub async fn welcome(data: actix_web::web::Data<SetupForumRSState>) -> impl Responder {
-    let result : String = (&data.hbs).render("setup/welcome", &json!({"test": "test"})).unwrap();
+    let result: String = (&data.hbs).render("setup/welcome", &json!({"test": "test"})).unwrap();
     HttpResponse::Ok().body(result)
 }
 
@@ -26,7 +30,7 @@ pub async fn login(data: actix_web::web::Data<SetupForumRSState>, req: HttpReque
     if data.setup_session.lock().unwrap().is_some() {
         // If the session cookie does not exist, return an error.
         if req.cookie("session").is_none() {
-            let result : String = (&data.hbs).render("setup/login", &json!({"session_error": "true"})).unwrap();
+            let result: String = (&data.hbs).render("setup/login", &json!({"session_error": "true"})).unwrap();
             return HttpResponse::Ok().body(result);
         }
         // If the session is valid, automatically return to the next location.
@@ -35,7 +39,7 @@ pub async fn login(data: actix_web::web::Data<SetupForumRSState>, req: HttpReque
         }
     }
 
-    let result : String = (&data.hbs).render("setup/login", &json!({"test": "test"})).unwrap();
+    let result: String = (&data.hbs).render("setup/login", &json!({"test": "test"})).unwrap();
     let mut builder = HttpResponse::Ok();
 
     // If the session cookie still exists, remove it as it cannot be valid.
@@ -81,7 +85,7 @@ pub async fn auth_login(data: actix_web::web::Data<SetupForumRSState>, form: web
             .header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap()))
             .finish()
     } else {
-        return HttpResponse::Found().header("Location", "/login?err=1").finish()
+        return HttpResponse::Found().header("Location", "/login?err=1").finish();
     }
 }
 
@@ -123,7 +127,7 @@ pub async fn general(data: actix_web::web::Data<SetupForumRSState>, req: HttpReq
         return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
     }
 
-    let result : String = (&data.hbs).render("setup/general", &json!({"test": "test"})).unwrap();
+    let result: String = (&data.hbs).render("setup/general", &json!({"test": "test"})).unwrap();
 
     HttpResponse::Ok().body(result)
 }
@@ -132,7 +136,8 @@ pub async fn general(data: actix_web::web::Data<SetupForumRSState>, req: HttpReq
 pub struct AuthGeneralForm {
     name: String,
     ip: String,
-    port: String
+    port: String,
+    domain: String
 }
 
 #[post("/auth/general")]
@@ -154,6 +159,10 @@ pub async fn auth_general(data: actix_web::web::Data<SetupForumRSState>, form: w
 
     if form.ip.len() < 1 {
         return HttpResponse::Found().header("Location", "/general?err=2").finish();
+    }
+
+    if form.domain.len() < 1 {
+        return HttpResponse::Found().header("Location", "/general?err=4").finish();
     }
 
     // Validate the ip address via regex.
@@ -178,9 +187,124 @@ pub async fn auth_general(data: actix_web::web::Data<SetupForumRSState>, form: w
     settings.name = form.name.clone();
     settings.ip = form.ip.clone();
     settings.port = port_num;
+    settings.domain = form.domain.clone();
     settings.setup_stage = Some(Security);
 
     SettingsManager::save_settings(&settings);
 
     return HttpResponse::Found().header("Location", "/security").finish();
+}
+
+#[get("/security")]
+pub async fn security(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Security) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let result: String = (&data.hbs).render("setup/security", &json!({"test": "test"})).unwrap();
+
+    HttpResponse::Ok().body(result)
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct AuthSecurityForm {
+    pub(crate) useSSL: Option<String>,
+    pub(crate) privateKey: Option<String>,
+    pub(crate) publicKey: Option<String>,
+    pub(crate) useCaptch: Option<String>,
+    pub(crate) siteKey: Option<String>,
+    pub(crate) secretKey: Option<String>,
+}
+
+#[post("/auth/security")]
+pub async fn auth_security(data: actix_web::web::Data<SetupForumRSState>, form: Form<AuthSecurityForm>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Security) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+
+    if form.useSSL.is_some() && form.useSSL.as_ref().unwrap() == "on" {
+        // The keys need to exist.
+        if form.privateKey.is_none() || form.publicKey.is_none() {
+            return HttpResponse::Found().header("Location", "/security?err=1").finish();
+        }
+        let private_key = form.privateKey.as_ref().unwrap().clone();
+        let public_key = form.publicKey.as_ref().unwrap().clone();
+
+        let key = Regex::new(r"^.*\.(pem|PEM|asn1|ASN1)$").unwrap();
+        if !key.is_match(private_key.as_str()) {
+            return HttpResponse::Found().header("Location", "/security?err=2").finish();
+        }
+
+        if !key.is_match(public_key.as_str()) {
+            return HttpResponse::Found().header("Location", "/security?err=3").finish();
+        }
+
+        if !Path::new(private_key.as_str()).exists() {
+            return HttpResponse::Found().header("Location", "/security?err=4").finish();
+        }
+
+        if !Path::new(public_key.as_str()).exists() {
+            return HttpResponse::Found().header("Location", "/security?err=5").finish();
+        }
+
+        settings.use_sll = true;
+
+        let ssl_settings = SSLSettings {
+            private_key,
+            public_key
+        };
+
+        settings.ssl_settings = Some(ssl_settings);
+    } else {
+        settings.use_sll = false;
+    }
+
+    if form.useCaptch.is_some() && form.useCaptch.as_ref().unwrap() == "on" {
+        // The keys need to exist.
+        if form.siteKey.is_none() || form.secretKey.is_none() {
+            return HttpResponse::Found().header("Location", "/security?err=6").finish();
+        }
+        let site_key = form.siteKey.as_ref().unwrap().clone();
+        let secret_key = form.secretKey.as_ref().unwrap().clone();
+
+        // I think the keys are always 40 in length.
+        if site_key.len() != 40 || secret_key.len() != 40 {
+            return HttpResponse::Found().header("Location", "/security?err=7").finish();
+        }
+
+        settings.use_captcha = true;
+
+        let captcha_settings = CaptchaSettings {
+            site_key,
+            secret_key
+        };
+
+        settings.captcha_settings = Some(captcha_settings);
+    }
+    else {
+        settings.use_captcha = false;
+    }
+
+    settings.setup_stage = Some(Storage);
+
+    SettingsManager::save_settings(&settings);
+
+    HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish()
 }
