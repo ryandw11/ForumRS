@@ -10,10 +10,14 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::settings::{BaseSettings, SettingsManager, SSLSettings, CaptchaSettings};
-use crate::setup::setup::SetupStage::{General, Security, Storage};
+use crate::settings::{BaseSettings, SettingsManager, SSLSettings, CaptchaSettings, DatabaseType, SqlSettings, MysqlSettings};
+use crate::setup::setup::SetupStage::{General, Security, Storage, ExistingStorage, Finished};
 use crate::state::SetupForumRSState;
 use std::path::Path;
+use crate::settings::DatabaseType::{SQLite, MySQL};
+use diesel::{MysqlConnection, Connection, QueryDsl, TextExpressionMethods};
+use crate::schema::general::ForumRSTable;
+use diesel::associations::HasTable;
 
 /// The welcome (index) page for the setup process.
 #[get("/")]
@@ -172,7 +176,7 @@ pub async fn auth_general(data: actix_web::web::Data<SetupForumRSState>, form: w
     }
 
     // Check if the port is an integer.
-    let port_num_opt = form.port.parse::<u16>();
+    let port_num_opt = form.port.parse::<u32>();
     if port_num_opt.is_err() {
         return HttpResponse::Found().header("Location", "/general?err=3").finish();
     }
@@ -307,4 +311,146 @@ pub async fn auth_security(data: actix_web::web::Data<SetupForumRSState>, form: 
     SettingsManager::save_settings(&settings);
 
     HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish()
+}
+
+#[get("/storage")]
+pub async fn storage(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Storage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let result: String = (&data.hbs).render("setup/storage", &json!({"test": "test"})).unwrap();
+
+    HttpResponse::Ok().body(result)
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct AuthStorageForm {
+    pub(crate) dbType: DatabaseType,
+
+    pub(crate) sqlName: Option<String>,
+
+    pub(crate) mysqlURL: Option<String>,
+    pub(crate) mysqlPort: Option<u32>,
+    pub(crate) mysqlUsername: Option<String>,
+    pub(crate) mysqlPassword: Option<String>,
+    pub(crate) mysqlDbName: Option<String>,
+
+    pub(crate) postURL: Option<String>,
+    pub(crate) postPort: Option<u32>,
+    pub(crate) postUsername: Option<String>,
+    pub(crate) postPassword: Option<String>,
+    pub(crate) postDbName: Option<String>,
+}
+
+#[post("/auth/storage")]
+pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: Form<AuthStorageForm>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Storage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+
+    match form.dbType.clone() {
+        DatabaseType::SQLite => {
+            if form.sqlName.is_none() {
+                return HttpResponse::Found().header("Location", "/storage?err=1").finish();
+            }
+
+            let sql_name = form.sqlName.as_ref().unwrap().clone();
+
+            let sql_regex = Regex::new(r"^.*\.(db)$").unwrap();
+            if !sql_regex.is_match(&sql_name) {
+                return HttpResponse::Found().header("Location", "/storage?err=1").finish();
+            }
+
+            settings.database_type = SQLite;
+            settings.sql_settings = Some(SqlSettings {
+                file_location: sql_name.clone()
+            });
+
+
+            if Path::new(sql_name.as_str()).exists() {
+                settings.setup_stage = Some(ExistingStorage);
+                SettingsManager::save_settings(&settings);
+                return HttpResponse::Found().header("Location", "/existingstorage").finish();
+            }
+
+            settings.setup_stage = Some(Finished);
+            SettingsManager::save_settings(&settings);
+            HttpResponse::Found().header("Location", "/finished").finish();
+        },
+        DatabaseType::MySQL => {
+            if form.mysqlURL.is_none() || form.mysqlDbName.is_none() || form.mysqlPassword.is_none() || form.mysqlPort.is_none()
+                || form.mysqlUsername.is_none() {
+                return HttpResponse::Found().header("Location", "/storage?err=2").finish();
+            }
+
+            let mysql_url = form.mysqlURL.as_ref().unwrap().clone();
+            let mysql_port = form.mysqlPort.as_ref().unwrap().clone();
+            let mysql_username = form.mysqlUsername.as_ref().unwrap().clone();
+            let mysql_password = form.mysqlPassword.as_ref().unwrap().clone();
+            let mysql_db_name = form.mysqlDbName.as_ref().unwrap().clone();
+
+            let connection = MysqlConnection::establish(&format!("mysql://{}:{}@{}:{}", mysql_username, mysql_password,
+            mysql_url, mysql_port));
+
+            if connection.is_err() {
+                // TODO show mysql connection error.
+                println!("mysql://{}:{}@{}:{}/{}", mysql_username, mysql_password,
+                         mysql_url, mysql_port, mysql_db_name);
+                connection.unwrap();
+                return HttpResponse::Found().header("Location", "/storage?err=3").finish();
+            }
+
+            // TODO :: create mysql database for the user without diesel.
+
+            settings.database_type = MySQL;
+            settings.mysql_settings = Some(MysqlSettings {
+                url: mysql_url,
+                port: mysql_port,
+                username: mysql_username,
+                password: mysql_password,
+                database_name: mysql_db_name
+            });
+
+            use crate::schema::general::forumrs::dsl::*;
+            use crate::diesel::RunQueryDsl;
+
+            // TODO check if an installation exists.
+
+            // let con = connection.unwrap();
+            // let found_table = forumrs::table().load(&con);
+            //
+            // if found_table.is_ok() {
+            //     settings.setup_stage = Some(ExistingStorage);
+            //     SettingsManager::save_settings(&settings);
+            //     return HttpResponse::Found().header("Location", "/existingstorage").finish();
+            // }
+
+            settings.setup_stage = Some(Finished);
+            SettingsManager::save_settings(&settings);
+            return HttpResponse::Found().header("Location", "/finished").finish();
+        },
+        DatabaseType::PostgreSQL => {
+            return HttpResponse::Found().header("Location", "/storage?err=420").finish();
+        }
+    }
+
+    unimplemented!()
 }

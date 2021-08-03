@@ -19,6 +19,7 @@ use crate::state::SetupForumRSState;
 pub mod settings;
 pub mod setup;
 pub mod state;
+pub mod schema;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -72,6 +73,8 @@ async fn main() -> std::io::Result<()> {
                 .service(setup::setup_router::auth_general)
                 .service(setup::setup_router::security)
                 .service(setup::setup_router::auth_security)
+                .service(setup::setup_router::storage)
+                .service(setup::setup_router::auth_storage)
         }).bind(format!("{}:{}", base_settings.ip, base_settings.port))?
             .run()
             .await

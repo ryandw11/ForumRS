@@ -5,7 +5,9 @@ use std::fmt::Formatter;
 pub enum SetupStage {
     General,
     Security,
-    Storage
+    Storage,
+    ExistingStorage,
+    Finished
 }
 
 /**
