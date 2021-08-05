@@ -15,9 +15,9 @@ use crate::setup::setup::SetupStage::{General, Security, Storage, ExistingStorag
 use crate::state::SetupForumRSState;
 use std::path::Path;
 use crate::settings::DatabaseType::{SQLite, MySQL};
-use diesel::{MysqlConnection, Connection, QueryDsl, TextExpressionMethods};
 use crate::schema::general::ForumRSTable;
 use diesel::associations::HasTable;
+use sqlx::{MySqlConnection, Connection};
 
 /// The welcome (index) page for the setup process.
 #[get("/")]
@@ -407,18 +407,21 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
             let mysql_password = form.mysqlPassword.as_ref().unwrap().clone();
             let mysql_db_name = form.mysqlDbName.as_ref().unwrap().clone();
 
-            let connection = MysqlConnection::establish(&format!("mysql://{}:{}@{}:{}", mysql_username, mysql_password,
-            mysql_url, mysql_port));
+            let connection = MySqlConnection::connect(&format!("mysql://{}:{}@{}:{}", mysql_username, mysql_password,
+            mysql_url, mysql_port)).await;
 
             if connection.is_err() {
-                // TODO show mysql connection error.
-                println!("mysql://{}:{}@{}:{}/{}", mysql_username, mysql_password,
-                         mysql_url, mysql_port, mysql_db_name);
-                connection.unwrap();
+                let connection_err = connection.unwrap_err();
+                if connection_err.as_database_error().is_some() {
+                    println!("[WARN] The following error occurred when connecting to the MySQL database: {:?}", connection_err.as_database_error().unwrap().message());
+                }
+                else {
+                    println!("[WARN] The following error occurred when connecting to the MySQL database: {:?}", connection_err);
+                    println!("[WARN] Check to make sure ForumRS can access the specified MySQL server.");
+                }
+
                 return HttpResponse::Found().header("Location", "/storage?err=3").finish();
             }
-
-            // TODO :: create mysql database for the user without diesel.
 
             settings.database_type = MySQL;
             settings.mysql_settings = Some(MysqlSettings {
@@ -426,22 +429,20 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
                 port: mysql_port,
                 username: mysql_username,
                 password: mysql_password,
-                database_name: mysql_db_name
+                database_name: mysql_db_name.clone()
             });
 
-            use crate::schema::general::forumrs::dsl::*;
-            use crate::diesel::RunQueryDsl;
+            let mut con = connection.unwrap();
+            let found_database = sqlx::query("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?")
+                .bind(mysql_db_name.clone())
+                .fetch_one(&mut con).await;
 
-            // TODO check if an installation exists.
-
-            // let con = connection.unwrap();
-            // let found_table = forumrs::table().load(&con);
-            //
-            // if found_table.is_ok() {
-            //     settings.setup_stage = Some(ExistingStorage);
-            //     SettingsManager::save_settings(&settings);
-            //     return HttpResponse::Found().header("Location", "/existingstorage").finish();
-            // }
+            if found_database.is_ok() {
+                // TODO ensure this code works.
+                settings.setup_stage = Some(ExistingStorage);
+                    SettingsManager::save_settings(&settings);
+                    return HttpResponse::Found().header("Location", "/existingstorage").finish();
+            }
 
             settings.setup_stage = Some(Finished);
             SettingsManager::save_settings(&settings);

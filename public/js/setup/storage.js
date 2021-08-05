@@ -40,49 +40,56 @@ document.getElementById("dbType").addEventListener('change', evt => {
   currentActiveConfig.style.display = "block";
 });
 
+/**
+ * Set the active configuration to the one desired.
+ * @param {*} desired The desired active configuration.
+ */
+function swapDBSettings(desired) {
+  for (let elem of currentActiveConfig.getElementsByTagName("input")) {
+    elem.disabled = true;
+  }
+  currentActiveConfig.style.display = "none";
+  currentActiveConfig = desired;
+  for (let elem of currentActiveConfig.getElementsByTagName("input")) {
+    elem.disabled = false;
+  }
+  currentActiveConfig.style.display = "block";
+
+  if (currentActiveConfig == mysqlConfig) {
+    document.getElementById("dbType").value = "MySQL";
+  } else if (currentActiveConfig == postgreConfig) {
+    document.getElementById("dbType").value = "PostgreSQL";
+  } else {
+    document.getElementById("dbType").value = "SQLite";
+  }
+}
+
 
 window.addEventListener('load', () => {
   const url = new URL(location.href);
   const err = url.searchParams.get('err');
-  const errorDoc = document.getElementById('ssl-error');
+  const errorDoc = document.getElementById('db-error');
   if (err == null) return;
   switch (err) {
     case '1':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'Please specify a public and private key for SSL.';
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Please specify a valid database location for SQLite.';
       errorDoc.style.display = 'block';
+      swapDBSettings(sqliteConfig);
       break;
     case '2':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'Please enter a valid private key that is a pem or asc1 file.';
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Please enter a value for every MySQL box.';
       errorDoc.style.display = 'block';
+      swapDBSettings(mysqlConfig);
       break;
     case '3':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'Please enter a valid public key that is a pem or asc1 file.';
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Cannot connect to specified MySQL server. Please ensure that the specified MySQL server exists and ForumRS has access to it. More information on the error is specified in the console.';
       errorDoc.style.display = 'block';
+      swapDBSettings(mysqlConfig);
       break;
-    case '4':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'The server cannot find the specified private key. Does the file exist and ForumRS has sufficent permissions to access it?';
+    case '420':
+      errorDoc.getElementsByTagName('span')[0].textContent = 'PostgreSQL is not implemented at this time. Please check back later.';
       errorDoc.style.display = 'block';
-      break;
-    case '5':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'The server cannot find the specified public key. Does the file exist and ForumRS has sufficent permissions to access it?';
-      errorDoc.style.display = 'block';
-      break;
-  }
-});
-
-window.addEventListener('load', () => {
-  const url = new URL(location.href);
-  const err = url.searchParams.get('err');
-  const errorDoc = document.getElementById('captcha-error');
-  if (err == null) return;
-  switch (err) {
-    case '6':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'Please specify a Site and Secret key.';
-      errorDoc.style.display = 'block';
-      break;
-    case '7':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'Please specify a valid Site and Secret key.';
-      errorDoc.style.display = 'block';
+      swapDBSettings(postgreConfig);
       break;
   }
 });
