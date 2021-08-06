@@ -75,6 +75,11 @@ async fn main() -> std::io::Result<()> {
                 .service(setup::setup_router::auth_security)
                 .service(setup::setup_router::storage)
                 .service(setup::setup_router::auth_storage)
+                .service(setup::setup_router::finished)
+                .service(setup::setup_router::auth_finished)
+                .service(setup::setup_router::existing_storage)
+                .service(setup::setup_router::auth_existing_storage_migrate)
+                .service(setup::setup_router::auth_existing_storage_reset)
         }).bind(format!("{}:{}", base_settings.ip, base_settings.port))?
             .run()
             .await

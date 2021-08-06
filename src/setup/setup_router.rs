@@ -1,23 +1,23 @@
 use std::borrow::Borrow;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use actix_web::{get, http, HttpMessage, HttpRequest, HttpResponse, post, Responder, web};
+use actix_web::rt::Arbiter;
 use actix_web::web::{Bytes, Form};
 use handlebars::Handlebars;
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::json;
+use sqlx::{Connection, MySqlConnection, PgConnection};
 use uuid::Uuid;
 
-use crate::settings::{BaseSettings, SettingsManager, SSLSettings, CaptchaSettings, DatabaseType, SqlSettings, MysqlSettings};
-use crate::setup::setup::SetupStage::{General, Security, Storage, ExistingStorage, Finished};
-use crate::state::SetupForumRSState;
-use std::path::Path;
-use crate::settings::DatabaseType::{SQLite, MySQL};
 use crate::schema::general::ForumRSTable;
-use diesel::associations::HasTable;
-use sqlx::{MySqlConnection, Connection};
+use crate::settings::{BaseSettings, CaptchaSettings, DatabaseType, MysqlSettings, PostgreSQLSettings, SettingsManager, SqlSettings, SSLSettings};
+use crate::settings::DatabaseType::{MySQL, PostgreSQL, SQLite};
+use crate::setup::setup::SetupStage::{ExistingStorage, Finished, General, Security, Storage};
+use crate::state::SetupForumRSState;
 
 /// The welcome (index) page for the setup process.
 #[get("/")]
@@ -331,6 +331,7 @@ pub async fn storage(data: actix_web::web::Data<SetupForumRSState>, req: HttpReq
     HttpResponse::Ok().body(result)
 }
 
+/// The form data for the auth.
 #[derive(Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct AuthStorageForm {
@@ -351,6 +352,7 @@ pub struct AuthStorageForm {
     pub(crate) postDbName: Option<String>,
 }
 
+/// The backed process for setting up the storage of the program.
 #[post("/auth/storage")]
 pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: Form<AuthStorageForm>, req: HttpRequest) -> impl Responder {
     // Check if the user is logged in.
@@ -437,8 +439,9 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
                 .bind(mysql_db_name.clone())
                 .fetch_one(&mut con).await;
 
+            con.close().await.unwrap();
+
             if found_database.is_ok() {
-                // TODO ensure this code works.
                 settings.setup_stage = Some(ExistingStorage);
                     SettingsManager::save_settings(&settings);
                     return HttpResponse::Found().header("Location", "/existingstorage").finish();
@@ -449,9 +452,193 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
             return HttpResponse::Found().header("Location", "/finished").finish();
         },
         DatabaseType::PostgreSQL => {
-            return HttpResponse::Found().header("Location", "/storage?err=420").finish();
+            if form.postURL.is_none() || form.postDbName.is_none() || form.postPassword.is_none() || form.postPort.is_none()
+                || form.postUsername.is_none() {
+                return HttpResponse::Found().header("Location", "/storage?err=4").finish();
+            }
+
+            let post_url = form.postURL.as_ref().unwrap().clone();
+            let post_port = form.postPort.as_ref().unwrap().clone();
+            let post_username = form.postUsername.as_ref().unwrap().clone();
+            let post_password = form.postPassword.as_ref().unwrap().clone();
+            let post_db_name = form.postDbName.as_ref().unwrap().clone();
+
+            let connection = PgConnection::connect(&format!("postgresql://{}:{}@{}:{}", post_username, post_password,
+                                                            post_url, post_port)).await;
+
+            if connection.is_err() {
+                let connection_err = connection.unwrap_err();
+                if connection_err.as_database_error().is_some() {
+                    println!("[WARN] The following error occurred when connecting to the PostgreSQL database: {:?}", connection_err.as_database_error().unwrap().message());
+                }
+                else {
+                    println!("[WARN] The following error occurred when connecting to the PostgreSQL database: {:?}", connection_err);
+                    println!("[WARN] Check to make sure ForumRS can access the specified PostgreSQL server.");
+                }
+
+                return HttpResponse::Found().header("Location", "/storage?err=5").finish();
+            }
+
+            settings.database_type = PostgreSQL;
+            settings.postgre_settings = Some(PostgreSQLSettings {
+                url: post_url,
+                port: post_port,
+                username: post_username,
+                password: post_password,
+                database_name: post_db_name.clone()
+            });
+
+            let mut con = connection.unwrap();
+            let found_database = sqlx::query(&format!("SELECT datname FROM pg_catalog.pg_database WHERE datname = '{}';", post_db_name))
+                .bind(post_db_name.clone())
+                .fetch_one(&mut con).await;
+
+            con.close().await.unwrap();
+
+            if found_database.is_ok() {
+                settings.setup_stage = Some(ExistingStorage);
+                SettingsManager::save_settings(&settings);
+                return HttpResponse::Found().header("Location", "/existingstorage").finish();
+            }
+
+            found_database.unwrap();
+
+            settings.setup_stage = Some(Finished);
+            SettingsManager::save_settings(&settings);
+            return HttpResponse::Found().header("Location", "/finished").finish();
         }
     }
 
-    unimplemented!()
+    HttpResponse::Found().header("Location", "/finished").finish()
+}
+
+#[get("/existingstorage")]
+pub async fn existing_storage(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == ExistingStorage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let result: String = (&data.hbs).render("setup/existingstorage", &json!({"test": "test"})).unwrap();
+
+    HttpResponse::Ok().body(result)
+}
+
+#[post("/auth/existingstorage/migrate")]
+pub async fn auth_existing_storage_migrate(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == ExistingStorage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+    settings.setup_stage = Some(Finished);
+
+    SettingsManager::save_settings(&settings);
+
+    HttpResponse::Found().header("Location", "/finished").finish()
+}
+
+#[post("/auth/existingstorage/reset")]
+pub async fn auth_existing_storage_reset(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == ExistingStorage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+
+    match settings.database_type {
+        DatabaseType::SQLite => {
+            std::fs::remove_file(Path::new(settings.sql_settings.as_ref().unwrap().file_location.as_str())).unwrap();
+        },
+        DatabaseType::MySQL => {
+            let mysql_settings = settings.mysql_settings.as_ref().unwrap();
+            let mut connection = MySqlConnection::connect(&format!("mysql://{}:{}@{}:{}", mysql_settings.username, mysql_settings.password,
+                                                               mysql_settings.url, mysql_settings.port)).await.unwrap();
+
+            let found_database = sqlx::query(&format!("DROP DATABASE IF EXISTS {};", mysql_settings.database_name))
+                .execute(&mut connection).await.unwrap();
+            connection.close().await.unwrap();
+        },
+        DatabaseType::PostgreSQL => {
+            let post_settings = settings.postgre_settings.as_ref().unwrap();
+            let mut connection = PgConnection::connect(&format!("postgresql://{}:{}@{}:{}", post_settings.username, post_settings.password,
+                                                            post_settings.url, post_settings.port)).await.unwrap();
+
+            // Drop the database if it exists.
+            let found_database = sqlx::query(&format!("DROP DATABASE IF EXISTS \"{}\";", post_settings.database_name))
+                .execute(&mut connection).await.unwrap();
+
+            connection.close().await.unwrap();
+        }
+    }
+
+    settings.setup_stage = Some(Finished);
+
+    SettingsManager::save_settings(&settings);
+
+    HttpResponse::Found().header("Location", "/finished").finish()
+}
+
+#[get("/finished")]
+pub async fn finished(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Finished) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let result: String = (&data.hbs).render("setup/finished", &json!({"test": "test"})).unwrap();
+
+    HttpResponse::Ok().body(result)
+}
+
+#[post("/auth/finished")]
+pub async fn auth_finished(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Finished) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+    settings.new_setup = false;
+    settings.setup_stage = None;
+
+    SettingsManager::save_settings(&settings);
+
+    println!("[INFO] Configuration complete. Please restart the server to launch ForumRS.");
+
+    Arbiter::current().stop();
+
+    std::process::exit(0);
 }

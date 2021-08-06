@@ -1,0 +1,103 @@
+<html lang='en'>
+
+<head>
+    <title>Migration | ForumRS Setup</title>
+    <link rel='icon' href='public/default/default_favicon.png' type='image/png' sizes='16x16' />
+
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css' rel='stylesheet'
+        integrity='sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC' crossorigin='anonymous' />
+
+    <link rel='stylesheet' href='public/css/setup/setup.css' />
+</head>
+
+<body>
+    <main class='container'>
+        <h1 class="mt-5">Forum<span class='RS'>RS</span> Configuration</h1>
+        <h2 class='mb-5'>Migration</h2>
+        <div style='width: 70%; margin: auto'>
+            <div id='general-message' class='alert alert-secondary'>
+                The ForumRS setup has possibly detected a previous setup within the database. Would you like to use the
+                existing data or
+                clear it?
+            </div>
+            <p class='text-center mt-5'><button type="button" class="btn btn-success" data-bs-toggle="modal"
+                    data-bs-target="#useExisting">Migrate Database</button>
+                <span class="info-nugget" tabindex='0' data-bs-toggle='popover' data-bs-trigger='hover focus'
+                    title='Migrate Help'
+                    data-bs-content='This option will use the existing data found within the specified database.'><i
+                        data-feather='info'></i></span>
+            </p>
+            <p class='text-center mt-3'>
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal"
+                    data-bs-target="#clearExisting">Reset Database</button>
+                <span class="info-nugget" tabindex='0' data-bs-toggle='popover' data-bs-trigger='hover focus'
+                    title='Reset Help'
+                    data-bs-content='This option will clear the database of any existing data and startover.'><i
+                        data-feather='info'></i></span>
+            </p>
+        </div>
+    </main>
+
+    <div class="modal fade" id="useExisting" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+        aria-labelledby="useExistingLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="useExistingLabel">Confirm Database Migration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure that you want to use the existing data found within the database?</p>
+                </div>
+                <div class="modal-footer">
+                    <form action='/auth/existingstorage/migrate' method='post' class='needs-validation'
+                        enctype='application/x-www-form-urlencoded' novalidate>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Confirm</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="clearExisting" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+        aria-labelledby="clearExistingLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="clearExistingLabel">Confirm Database Reset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure that you want to clear the existing data from the database and start fresh?</p>
+                </div>
+                <div class="modal-footer">
+                    <form action='/auth/existingstorage/reset' method='post' class='needs-validation'
+                        enctype='application/x-www-form-urlencoded' novalidate>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-danger">Confirm</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js'
+        integrity='sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM'
+        crossorigin='anonymous'></script>
+    <script src='https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js'></script>
+    <script>
+        (function () {
+            'use strict'; feather.replace({ width: '24', height: '24', 'stroke-width': '1' }); var forms =
+                document.querySelectorAll('.needs-validation').forEach(function (form) {
+                    form.addEventListener('submit', function (event) {
+                        if
+                            (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); } form.classList.add('was-validated');
+                    }, false)
+                })
+        })();
+        for (nugget of document.querySelectorAll(".info-nugget")) { var popover = new bootstrap.Popover(nugget, { sanitize: false }); }
+    </script>
+</body>
+
+</html>

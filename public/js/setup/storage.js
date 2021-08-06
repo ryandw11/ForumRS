@@ -86,8 +86,13 @@ window.addEventListener('load', () => {
       errorDoc.style.display = 'block';
       swapDBSettings(mysqlConfig);
       break;
-    case '420':
-      errorDoc.getElementsByTagName('span')[0].textContent = 'PostgreSQL is not implemented at this time. Please check back later.';
+    case '4':
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Please enter a value for every PostgreSQL box.';
+      errorDoc.style.display = 'block';
+      swapDBSettings(postgreConfig);
+      break;
+    case '5':
+      errorDoc.getElementsByTagName('span')[0].textContent = 'Cannot connect to specified PostgreSQL server. Please ensure that the specified PostgreSQL server exists and ForumRS has access to it. More information on the error is specified in the console.';
       errorDoc.style.display = 'block';
       swapDBSettings(postgreConfig);
       break;
