@@ -7,6 +7,7 @@ pub enum SetupStage {
     Security,
     Storage,
     ExistingStorage,
+    AccountCreation,
     Finished
 }
 

@@ -16,7 +16,7 @@ use uuid::Uuid;
 use crate::schema::general::ForumRSTable;
 use crate::settings::{BaseSettings, CaptchaSettings, DatabaseType, MysqlSettings, PostgreSQLSettings, SettingsManager, SqlSettings, SSLSettings};
 use crate::settings::DatabaseType::{MySQL, PostgreSQL, SQLite};
-use crate::setup::setup::SetupStage::{ExistingStorage, Finished, General, Security, Storage};
+use crate::setup::setup::SetupStage::{ExistingStorage, Finished, General, Security, Storage, AccountCreation};
 use crate::state::SetupForumRSState;
 
 /// The welcome (index) page for the setup process.
@@ -393,9 +393,9 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
                 return HttpResponse::Found().header("Location", "/existingstorage").finish();
             }
 
-            settings.setup_stage = Some(Finished);
+            settings.setup_stage = Some(AccountCreation);
             SettingsManager::save_settings(&settings);
-            HttpResponse::Found().header("Location", "/finished").finish();
+            HttpResponse::Found().header("Location", "/accountcreation").finish();
         },
         DatabaseType::MySQL => {
             if form.mysqlURL.is_none() || form.mysqlDbName.is_none() || form.mysqlPassword.is_none() || form.mysqlPort.is_none()
@@ -447,9 +447,9 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
                     return HttpResponse::Found().header("Location", "/existingstorage").finish();
             }
 
-            settings.setup_stage = Some(Finished);
+            settings.setup_stage = Some(AccountCreation);
             SettingsManager::save_settings(&settings);
-            return HttpResponse::Found().header("Location", "/finished").finish();
+            return HttpResponse::Found().header("Location", "/accountcreation").finish();
         },
         DatabaseType::PostgreSQL => {
             if form.postURL.is_none() || form.postDbName.is_none() || form.postPassword.is_none() || form.postPort.is_none()
@@ -501,15 +501,13 @@ pub async fn auth_storage(data: actix_web::web::Data<SetupForumRSState>, form: F
                 return HttpResponse::Found().header("Location", "/existingstorage").finish();
             }
 
-            found_database.unwrap();
-
-            settings.setup_stage = Some(Finished);
+            settings.setup_stage = Some(AccountCreation);
             SettingsManager::save_settings(&settings);
-            return HttpResponse::Found().header("Location", "/finished").finish();
+            return HttpResponse::Found().header("Location", "/accountcreation").finish();
         }
     }
 
-    HttpResponse::Found().header("Location", "/finished").finish()
+    HttpResponse::Found().header("Location", "/accountcreation").finish()
 }
 
 #[get("/existingstorage")]
@@ -592,11 +590,56 @@ pub async fn auth_existing_storage_reset(data: actix_web::web::Data<SetupForumRS
         }
     }
 
-    settings.setup_stage = Some(Finished);
+    settings.setup_stage = Some(AccountCreation);
 
     SettingsManager::save_settings(&settings);
 
-    HttpResponse::Found().header("Location", "/finished").finish()
+    HttpResponse::Found().header("Location", "/accountcreation").finish()
+}
+
+#[get("/accountcreation")]
+pub async fn account_creation(data: actix_web::web::Data<SetupForumRSState>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == AccountCreation) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let result: String = (&data.hbs).render("setup/accountcreation", &json!({"test": "test"})).unwrap();
+
+    HttpResponse::Ok().body(result)
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct AuthAccountCreation {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub confirmPassword: String,
+}
+
+#[post("/auth/accountcreation")]
+pub async fn auth_account_creation(data: actix_web::web::Data<SetupForumRSState>, form: Form<AuthAccountCreation>, req: HttpRequest) -> impl Responder {
+    // Check if the user is logged in.
+    let loggedin = check_login(&data, req);
+    if loggedin.is_err() {
+        return loggedin.unwrap_err();
+    }
+
+    // If the user is at the wrong stage, take them to the correct one.
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == Storage) {
+        return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    let mut settings = SettingsManager::get_settings();
+
+    unimplemented!()
 }
 
 #[get("/finished")]

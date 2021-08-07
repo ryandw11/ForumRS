@@ -80,6 +80,8 @@ async fn main() -> std::io::Result<()> {
                 .service(setup::setup_router::existing_storage)
                 .service(setup::setup_router::auth_existing_storage_migrate)
                 .service(setup::setup_router::auth_existing_storage_reset)
+                .service(setup::setup_router::account_creation)
+                .service(setup::setup_router::auth_account_creation)
         }).bind(format!("{}:{}", base_settings.ip, base_settings.port))?
             .run()
             .await
