@@ -633,8 +633,12 @@ pub async fn auth_account_creation(data: actix_web::web::Data<SetupForumRSState>
     }
 
     // If the user is at the wrong stage, take them to the correct one.
-    if !(SettingsManager::get_settings().setup_stage.unwrap() == Storage) {
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == AccountCreation) {
         return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
+    }
+
+    if form.password != form.confirmPassword {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=1").finish();
     }
 
     let mut settings = SettingsManager::get_settings();
