@@ -12,12 +12,15 @@ use serde::Deserialize;
 use serde_json::json;
 use sqlx::{Connection, MySqlConnection, PgConnection};
 use uuid::Uuid;
+use bcrypt;
 
-use crate::schema::general::ForumRSTable;
 use crate::settings::{BaseSettings, CaptchaSettings, DatabaseType, MysqlSettings, PostgreSQLSettings, SettingsManager, SqlSettings, SSLSettings};
 use crate::settings::DatabaseType::{MySQL, PostgreSQL, SQLite};
 use crate::setup::setup::SetupStage::{ExistingStorage, Finished, General, Security, Storage, AccountCreation};
 use crate::state::SetupForumRSState;
+use crate::schema::database::Database;
+use std::time::Duration;
+use crate::schema::tables::{Users, Forums};
 
 /// The welcome (index) page for the setup process.
 #[get("/")]
@@ -633,11 +636,66 @@ pub async fn auth_account_creation(data: actix_web::web::Data<SetupForumRSState>
     }
 
     // If the user is at the wrong stage, take them to the correct one.
-    if !(SettingsManager::get_settings().setup_stage.unwrap() == Storage) {
+    if !(SettingsManager::get_settings().setup_stage.unwrap() == AccountCreation) {
         return HttpResponse::Found().header("Location", format!("/{}", SettingsManager::get_settings().setup_stage.unwrap())).finish();
     }
 
+    if form.username.len() < 1 {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=1").finish();
+    }
+
+    if form.password.len() < 1 {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=2").finish();
+    }
+
+    // Validate the ip address via regex.
+    let password_regex = Regex::new(r"^(?=.*[A-Z].*[A-Z])(?=.*[!@#$&*%^])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{8,}$").unwrap();
+    if !password_regex.is_match(form.password.as_str()) {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=2").finish();
+    }
+
+    if form.password != form.confirmPassword {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=3").finish();
+    }
+
+    // TODO validate email.
+    if form.email.len() < 1 {
+        return HttpResponse::Found().header("Location", "/accountcreation?err=4").finish();
+    }
+
+    // Start off by setting up the db.
     let mut settings = SettingsManager::get_settings();
+
+    let mut db;
+
+    match settings.database_type {
+        SQLite => {
+            db = Database::new_sqlite(settings.sql_settings.as_ref().unwrap()).await.unwrap();
+            crate::schema::dbsetup::setup_database(&mut db).await;
+        }
+        MySQL => {
+            crate::schema::dbsetup::create_schema_mysql(settings.mysql_settings.as_ref().unwrap()).await;
+            db = Database::new_mysql(settings.mysql_settings.as_ref().unwrap()).await.unwrap();
+            crate::schema::dbsetup::setup_database(&mut db).await;
+        }
+        PostgreSQL => {
+            crate::schema::dbsetup::create_schema_postgre(settings.postgre_settings.as_ref().unwrap()).await;
+            std::thread::sleep(Duration::from_millis(100));
+            db = Database::new_postgre(settings.postgre_settings.as_ref().unwrap()).await.unwrap();
+            crate::schema::dbsetup::setup_database(&mut db).await;
+        }
+    };
+
+    // TODO verify data
+
+    let hashed_password = bcrypt::hash(form.password.clone(), bcrypt::DEFAULT_COST).unwrap();
+
+    // Insert the admin user.
+    Users::insert(&mut db, Uuid::new_v4(), form.username.clone(), form.email.clone(), hashed_password, false, true).await;
+
+    // Insert default forums.
+    Forums::insert(&mut db, Uuid::new_v4(), "Announcements".to_string(), "General announcements for the website.".to_string()).await;
+    Forums::insert(&mut db, Uuid::new_v4(), "General".to_string(), "General forum discussions.".to_string()).await;
 
     unimplemented!()
 }
